@@ -9,9 +9,11 @@ from functions import (
     claim_tasks,
     check_user_points,
     enroll_verify,
+    btc_quest,
+    eth_quest,
 )
 
-RPC = "https://zetachain-mainnet-archive.allthatnode.com:8545" 
+RPC = "https://zetachain-mainnet-archive.allthatnode.com:8545"
 web3 = Web3(Web3.HTTPProvider(RPC))
 private_keys = []
 with open("keys.txt", "r") as f:
@@ -29,8 +31,10 @@ if __name__ == "__main__":
             "\n4: Receive BNB in ZetaChain  | +2500 XP "
             "\n5: Approve BNB for LP transaction"
             "\n6: LP any core pool          | +5000 XP"
-            "\n7: Check total XP|Rank|Level"
-            "\n8: Claim all available tasks"
+            "\n7: Receive BTC in Zetachain  | +2500 XP"
+            "\n8: Receive ETH in Zetachain  | +2500 XP"
+            "\n9: Check total XP|Rank|Level"
+            "\n10: Claim all available tasks"
             "\n----------------------"
             "\nChoice: "
         )
@@ -42,8 +46,10 @@ if __name__ == "__main__":
         4: bsc_quest,
         5: approve,
         6: pool_tx,
-        7: check_user_points,
-        8: claim_tasks,
+        7: btc_quest,
+        8: eth_quest,
+        9: check_user_points,
+        10: claim_tasks,
     }
     for key in private_keys:
         try:
