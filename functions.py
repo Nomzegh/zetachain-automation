@@ -17,7 +17,8 @@ from config import (
     transactions_break_time,
     enroll_verify_time,
     zeta_value_btc,
-    zeta_value_eth
+    zeta_value_eth,
+    zeta_value_bnb,
 )
 
 
@@ -401,3 +402,51 @@ def eth_quest(private_key: str):
         time.sleep(transactions_break_time)
     print(f"{current_time()} | Receive ETH TX: {transaction_hash}")
     time.sleep(transactions_break_time)
+
+
+def bsc_izumi_quest(private_key: str):
+    account = web3.eth.account.from_key(private_key)
+    contract_for_encoding = web3.eth.contract(
+        address=web3.to_checksum_address("0x8Afb66B7ffA1936ec5914c7089D50542520208b8"),
+        abi=encoding_contract_abi,
+    )
+    main_contract = web3.eth.contract(
+        address=web3.to_checksum_address("0x34bc1b87f60e0a30c0e24FD7Abada70436c71406"),
+        abi=multicall_abi,
+    )
+    encoded_data = contract_for_encoding.encodeABI(
+        fn_name="swapAmount",
+        args=[
+            (
+                b"_\x0b\x1a\x82t\x9c\xb4\xe2'\x8e\xc8\x7f\x8b\xf6\xb6\x18\xdcq\xa8\xbf\x00'\x10H\xf8\x06\x08\xb6r\xdc0\xdc~=\xbb\xd04<_\x02\xc78\xeb",
+                account.address,
+                web3.to_wei(zeta_value_bnb, "ether"),
+                10,
+                web3.eth.get_block("latest").timestamp + 3600,
+            )
+        ],
+    )
+    tx_data = main_contract.encodeABI(
+        fn_name="multicall", args=[[encoded_data, "0x12210e8a"]]
+    )
+
+    tx = {
+        "from": account.address,
+        "to": web3.to_checksum_address("0x34bc1b87f60e0a30c0e24FD7Abada70436c71406"),
+        "value": web3.to_wei(zeta_value_bnb, "ether"),
+        "nonce": web3.eth.get_transaction_count(account.address),
+        "gasPrice": web3.eth.gas_price,
+        "chainId": 7000,
+        "data": tx_data,
+    }
+    tx["gas"] = int(web3.eth.estimate_gas(tx))
+    signed_txn = web3.eth.account.sign_transaction(tx, private_key)
+    transaction_hash = web3.eth.send_raw_transaction(signed_txn.rawTransaction).hex()
+    print(f"{current_time()} | Waiting for BNB (Izumi Finance) quest TX to complete...")
+    receipt = web3.eth.wait_for_transaction_receipt(transaction_hash)
+    if receipt.status != 1:
+        print(f"{current_time()} | Transaction {transaction_hash} failed!")
+        time.sleep(transactions_break_time)
+    print(f"{current_time()} | Receive BNB TX: {transaction_hash}")
+    time.sleep(transactions_break_time)
+
