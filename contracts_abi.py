@@ -29,3 +29,43 @@ approve_abi = [
         "constant": False,
     }
 ]
+
+encoding_contract_abi = [
+    {
+        "inputs": [
+            {
+                "components": [
+                    {"internalType": "bytes", "name": "path", "type": "bytes"},
+                    {"internalType": "address", "name": "recipient", "type": "address"},
+                    {"internalType": "uint128", "name": "amount", "type": "uint128"},
+                    {
+                        "internalType": "uint256",
+                        "name": "minAcquired",
+                        "type": "uint256",
+                    },
+                    {"internalType": "uint256", "name": "deadline", "type": "uint256"},
+                ],
+                "internalType": "struct Swap.SwapAmountParams",
+                "name": "params",
+                "type": "tuple",
+            }
+        ],
+        "name": "swapAmount",
+        "outputs": [
+            {"internalType": "uint256", "name": "cost", "type": "uint256"},
+            {"internalType": "uint256", "name": "acquire", "type": "uint256"},
+        ],
+        "stateMutability": "payable",
+        "type": "function",
+    }
+]
+
+multicall_abi = [
+    {
+        "inputs": [{"internalType": "bytes[]", "name": "data", "type": "bytes[]"}],
+        "name": "multicall",
+        "outputs": [{"internalType": "bytes[]", "name": "results", "type": "bytes[]"}],
+        "stateMutability": "payable",
+        "type": "function",
+    }
+]
