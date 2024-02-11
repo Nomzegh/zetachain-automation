@@ -2,7 +2,7 @@ import requests
 import time
 from web3 import Web3
 from eth_account.messages import encode_structured_data
-from contracts_abi import pool_abi, approve_abi
+from contracts_abi import pool_abi, approve_abi, encoding_contract_abi, multicall_abi
 from config import (
     RPC,
     BSC_RPC,
@@ -16,6 +16,8 @@ from config import (
     claim_tasks_time,
     transactions_break_time,
     enroll_verify_time,
+    zeta_value_btc,
+    zeta_value_eth
 )
 
 
