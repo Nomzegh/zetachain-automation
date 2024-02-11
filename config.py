@@ -9,6 +9,7 @@ bnb_to_approve = 0.0001  # Сколько аппрувить BNB в Zeta для 
 bsc_gasprice = 1.1  # gasPrice в BSC (не ставить ниже 1, так как транзакция зависнет)
 zeta_value_btc = 0.001  # Сколько отдаем ZETA для транзакции ZETA->BTC.BTC (Выставленное самое минимальное значение)
 zeta_value_eth = 0.0001  # Сколько отдаем ZETA для транзакции ZETA->ETH.ETH (Выставленное самое минимальное значение)
+zeta_value_bnb = 0.001  # Сколько отдаем ZETA для транзакции ZETA->BNB.BSC (izumi finance)
 
 # Настройки времени
 enroll_verify_time = 1.5  # Время между Enroll Verify
