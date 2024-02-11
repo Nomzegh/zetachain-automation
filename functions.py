@@ -26,7 +26,7 @@ web3 = Web3(Web3.HTTPProvider(RPC))
 
 
 def current_time():
-    cur_time = time.strftime("%Y-%m-%d %H:%M:%S.%f")[:-3]
+    cur_time = time.strftime("%Y-%m-%d %H:%M:%S")[:-3]
     return cur_time
 
 
