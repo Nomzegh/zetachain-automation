@@ -11,6 +11,7 @@ from functions import (
     enroll_verify,
     btc_quest,
     eth_quest,
+    bsc_izumi_quest,
 )
 
 RPC = "https://zetachain-mainnet-archive.allthatnode.com:8545"
@@ -33,8 +34,9 @@ if __name__ == "__main__":
             "\n6: LP any core pool          | +5000 XP"
             "\n7: Receive BTC in Zetachain  | +2500 XP"
             "\n8: Receive ETH in Zetachain  | +2500 XP"
-            "\n9: Check total XP|Rank|Level"
-            "\n10: Claim all available tasks"
+            "\n9: Receive BNB (Izumi)       | +2500 XP"
+            "\n10: Check total XP|Rank|Level"
+            "\n11: Claim all available tasks"
             "\n----------------------"
             "\nChoice: "
         )
@@ -48,8 +50,9 @@ if __name__ == "__main__":
         6: pool_tx,
         7: btc_quest,
         8: eth_quest,
-        9: check_user_points,
-        10: claim_tasks,
+        9: bsc_izumi_quest,
+        10: check_user_points,
+        11: claim_tasks,
     }
     for key in private_keys:
         try:
