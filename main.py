@@ -17,10 +17,18 @@ from functions import (
 RPC = "https://zetachain-mainnet-archive.allthatnode.com:8545"
 web3 = Web3(Web3.HTTPProvider(RPC))
 private_keys = []
+proxies = []
+
 with open("keys.txt", "r") as f:
     for line in f:
         line = line.strip()
         private_keys.append(line)
+
+with open("proxies.txt", "r") as p:
+    for proxy in p:
+        proxy = proxy.strip()
+        proxies.append(proxy)
+
 
 if __name__ == "__main__":
     choice = int(
@@ -54,10 +62,14 @@ if __name__ == "__main__":
         10: check_user_points,
         11: claim_tasks,
     }
-    for key in private_keys:
+
+    for key, proxy in zip(private_keys, proxies):
         try:
             if choice in transaction_functions:
-                transaction_functions[choice](key)
+                if proxy:
+                    transaction_functions[choice](key, proxy)
+                else:
+                    transaction_functions[choice](key)
             else:
                 print(f"Wrong choice number. 1 | 2 | 3 ...")
         except Exception as e:
