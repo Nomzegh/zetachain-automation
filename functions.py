@@ -2,6 +2,7 @@ import requests
 import time
 from web3 import Web3
 from eth_account.messages import encode_structured_data
+from fake_useragent import UserAgent
 from contracts_abi import pool_abi, approve_abi, encoding_contract_abi, multicall_abi
 from config import (
     RPC,
@@ -22,16 +23,30 @@ from config import (
 )
 
 
-web3 = Web3(Web3.HTTPProvider(RPC))
-
-
 def current_time():
     cur_time = time.strftime("%Y-%m-%d %H:%M:%S")[:-3]
     return cur_time
 
 
-def generate_signature(private_key: str) -> hex:
-    web3 = Web3(Web3.HTTPProvider(RPC))
+def create_web3_with_proxy(rpc_endpoint, proxy=None):
+    if proxy is None:
+        return Web3(Web3.HTTPProvider(rpc_endpoint))
+
+    proxy_type = proxy.split(":")[0]
+    request_kwargs = {"proxies": {proxy_type: proxy}}
+
+    return Web3(Web3.HTTPProvider(rpc_endpoint, request_kwargs=request_kwargs))
+
+
+def create_proxy(proxy=None):
+    if proxy is not None:
+        proxy_type = proxy.split(":")[0]
+        return {proxy_type: proxy}
+    return None
+
+
+def generate_signature(private_key: str, proxy=None) -> hex:
+    web3 = create_web3_with_proxy(RPC, proxy)
     msg = {
         "types": {
             "Message": [{"name": "content", "type": "string"}],
@@ -53,7 +68,8 @@ def generate_signature(private_key: str) -> hex:
     return claim_signature
 
 
-def enroll(private_key: str) -> str:
+def enroll(private_key: str, proxy=None) -> str:
+    web3 = create_web3_with_proxy(RPC, proxy)
     account = web3.eth.account.from_key(private_key)
     tx = {
         "from": account.address,
@@ -80,11 +96,13 @@ def enroll(private_key: str) -> str:
     time.sleep(transactions_break_time)
 
 
-def enroll_verify(private_key):
+def enroll_verify(private_key: str, proxy=None):
+    web3 = create_web3_with_proxy(RPC, proxy)
     account = web3.eth.account.from_key(private_key)
     print(f"{current_time()} |  Verifying enroll for {account.address}...")
 
     headers = {
+        "User-Agent": UserAgent().random,
         "authority": "xp.cl04.zetachain.com",
         "Accept": "application/json, text/plain, */*",
         "Origin": "https://hub.zetachain.com",
@@ -93,11 +111,12 @@ def enroll_verify(private_key):
     params = {
         "address": account.address,
     }
-
+    
     response = requests.post(
         "https://xp.cl04.zetachain.com/v1/enroll-in-zeta-xp",
         headers=headers,
         json=params,
+        proxies=create_proxy(proxy),
     )
     if response.status_code == 200:
         response = response.json()
@@ -108,7 +127,8 @@ def enroll_verify(private_key):
         time.sleep(enroll_verify_time)
 
 
-def transfer(private_key: str) -> str:
+def transfer(private_key: str, proxy=None) -> str:
+    web3 = create_web3_with_proxy(RPC, proxy)
     account = web3.eth.account.from_key(private_key)
     tx = {
         "from": account.address,
@@ -130,8 +150,8 @@ def transfer(private_key: str) -> str:
     time.sleep(transactions_break_time)
 
 
-def bsc_quest(private_key: str) -> str:
-    web3 = Web3(Web3.HTTPProvider(BSC_RPC))
+def bsc_quest(private_key: str, proxy=None) -> str:
+    web3 = create_web3_with_proxy(BSC_RPC, proxy)
     account = web3.eth.account.from_key(private_key)
     tx = {
         "from": account.address,
@@ -155,11 +175,13 @@ def bsc_quest(private_key: str) -> str:
     time.sleep(transactions_break_time)
 
 
-def check_user_points(private_key):
+def check_user_points(private_key: str, proxy=None):
+    web3 = create_web3_with_proxy(RPC, proxy)
     account = web3.eth.account.from_key(private_key)
     session = requests.Session()
     session.headers.update(
         {
+            "User-Agent": UserAgent().random,
             "Accept": "application/json, text/plain, */*",
             "Origin": "https://hub.zetachain.com",
             "Connection": "keep-alive",
@@ -173,6 +195,7 @@ def check_user_points(private_key):
     response = session.get(
         "https://xp.cl04.zetachain.com/v1/get-points",
         params=params,
+        proxies=create_proxy(proxy),
     )
     if response.status_code == 200:
         response = response.json()
@@ -185,9 +208,11 @@ def check_user_points(private_key):
         time.sleep(check_user_points_time)
 
 
-def check_tasks(private_key):
+def check_tasks(private_key: str, proxy=None):
+    web3 = create_web3_with_proxy(RPC, proxy)
     account = web3.eth.account.from_key(private_key)
     headers = {
+        "User-Agent": UserAgent().random,
         "Accept": "application/json, text/plain, */*",
         "Origin": "https://hub.zetachain.com",
         "Connection": "keep-alive",
@@ -201,6 +226,7 @@ def check_tasks(private_key):
         "https://xp.cl04.zetachain.com/v1/get-user-has-xp-to-refresh",
         params=check_params,
         headers=headers,
+        proxies=create_proxy(proxy),
     )
     quests_to_refresh = []
     check_resp = check_resp.json()
@@ -213,10 +239,11 @@ def check_tasks(private_key):
     return quests_to_refresh
 
 
-def claim_tasks(private_key):
+def claim_tasks(private_key: str, proxy=None):
+    web3 = create_web3_with_proxy(RPC, proxy)
     account = web3.eth.account.from_key(private_key)
     quest_list = check_tasks(private_key)
-    account = web3.eth.account.from_key(private_key)
+
     if quest_list == []:
         print(f"{current_time()} | Nothing to claim for address {account.address}")
         time.sleep(claim_tasks_time)
@@ -231,6 +258,7 @@ def claim_tasks(private_key):
         }
         session.headers.update(
             {
+                "User-Agent": UserAgent().random,
                 "Accept": "application/json, text/plain, */*",
                 "Origin": "https://hub.zetachain.com",
                 "Connection": "keep-alive",
@@ -240,6 +268,7 @@ def claim_tasks(private_key):
         response = session.post(
             "https://xp.cl04.zetachain.com/v1/xp/claim-task",
             json=claim_data,
+            proxies=create_proxy(proxy),
         )
         response = response.json()
 
@@ -247,7 +276,8 @@ def claim_tasks(private_key):
         time.sleep(claim_tasks_time)
 
 
-def pool_tx(private_key):
+def pool_tx(private_key: str, proxy=None):
+    web3 = create_web3_with_proxy(RPC, proxy)
     contract = web3.eth.contract(
         address=web3.to_checksum_address("0x2ca7d64A7EFE2D62A725E2B35Cf7230D6677FfEe"),
         abi=pool_abi,
@@ -281,7 +311,8 @@ def pool_tx(private_key):
     time.sleep(transactions_break_time)
 
 
-def approve(private_key):
+def approve(private_key: str, proxy=None):
+    web3 = create_web3_with_proxy(RPC, proxy)
     contract = web3.eth.contract(
         address=web3.to_checksum_address("0x48f80608B672DC30DC7e3dbBd0343c5F02C738Eb"),
         abi=approve_abi,
@@ -311,7 +342,8 @@ def approve(private_key):
     time.sleep(transactions_break_time)
 
 
-def btc_quest(private_key: str):
+def btc_quest(private_key: str, proxy=None):
+    web3 = create_web3_with_proxy(RPC, proxy)
     account = web3.eth.account.from_key(private_key)
     contract_for_encoding = web3.eth.contract(
         address=web3.to_checksum_address("0x8Afb66B7ffA1936ec5914c7089D50542520208b8"),
@@ -357,7 +389,8 @@ def btc_quest(private_key: str):
     time.sleep(transactions_break_time)
 
 
-def eth_quest(private_key: str):
+def eth_quest(private_key: str, proxy=None):
+    web3 = create_web3_with_proxy(RPC, proxy)
     account = web3.eth.account.from_key(private_key)
     contract_for_encoding = web3.eth.contract(
         address=web3.to_checksum_address("0x8Afb66B7ffA1936ec5914c7089D50542520208b8"),
@@ -404,7 +437,8 @@ def eth_quest(private_key: str):
     time.sleep(transactions_break_time)
 
 
-def bsc_izumi_quest(private_key: str):
+def bsc_izumi_quest(private_key: str, proxy=None):
+    web3 = create_web3_with_proxy(RPC, proxy)
     account = web3.eth.account.from_key(private_key)
     contract_for_encoding = web3.eth.contract(
         address=web3.to_checksum_address("0x8Afb66B7ffA1936ec5914c7089D50542520208b8"),
@@ -449,4 +483,3 @@ def bsc_izumi_quest(private_key: str):
         time.sleep(transactions_break_time)
     print(f"{current_time()} | Receive BNB TX: {transaction_hash}")
     time.sleep(transactions_break_time)
-
