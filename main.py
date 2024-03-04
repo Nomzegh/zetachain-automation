@@ -5,13 +5,15 @@ from functions import (
     enroll,
     transfer,
     pool_tx,
-    bsc_quest,
     claim_tasks,
     check_user_points,
     enroll_verify,
     btc_quest,
     eth_quest,
     bsc_izumi_quest,
+    eddy_finance,
+    accumulated_finance,
+    range_protocol,
 )
 
 RPC = "https://zetachain-mainnet-archive.allthatnode.com:8545"
@@ -37,14 +39,16 @@ if __name__ == "__main__":
             "\n1: Enroll                    | +2000 XP ONCE"
             "\n2: Enroll verify             "
             "\n3: Send & Receive Zeta quest | +3500 XP"
-            "\n4: Receive BNB in ZetaChain  | +2500 XP "
-            "\n5: Approve BNB for LP transaction"
-            "\n6: LP any core pool          | +5000 XP"
-            "\n7: Receive BTC in Zetachain  | +2500 XP"
-            "\n8: Receive ETH in Zetachain  | +2500 XP"
-            "\n9: Receive BNB (Izumi)       | +2500 XP"
-            "\n10: Check total XP|Rank|Level"
-            "\n11: Claim all available tasks"
+            "\n4: Approve BNB for LP transaction"
+            "\n5: LP any core pool          | +5000 XP"
+            "\n6: Receive BTC in Zetachain  | +2500 XP"
+            "\n7: Receive ETH in Zetachain  | +2500 XP"
+            "\n8: Receive BNB (Izumi)       | +2500 XP"
+            "\n9: EddyFinance quest         | +2500 XP"
+            "\n10: Liquidity on Range quest | +2500 XP"
+            "\n11: Accumulated Finance quest| +2500 XP"
+            "\n12: Check total XP|Rank|Level"
+            "\n13: Claim all available tasks"
             "\n----------------------"
             "\nChoice: "
         )
@@ -53,14 +57,16 @@ if __name__ == "__main__":
         1: enroll,
         2: enroll_verify,
         3: transfer,
-        4: bsc_quest,
-        5: approve,
-        6: pool_tx,
-        7: btc_quest,
-        8: eth_quest,
-        9: bsc_izumi_quest,
-        10: check_user_points,
-        11: claim_tasks,
+        4: approve,
+        5: pool_tx,
+        6: btc_quest,
+        7: eth_quest,
+        8: bsc_izumi_quest,
+        9: eddy_finance,
+        10: range_protocol,
+        11: accumulated_finance,
+        12: check_user_points,
+        13: claim_tasks,
     }
 
     for key, proxy in zip(private_keys, proxies):
