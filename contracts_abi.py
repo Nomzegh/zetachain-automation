@@ -69,3 +69,55 @@ multicall_abi = [
         "type": "function",
     }
 ]
+
+accfinance_mint_abi = [
+    {
+        "inputs": [{"internalType": "address", "name": "", "type": "address"}],
+        "name": "deposit",
+        "outputs": [],
+        "stateMutability": "payable",
+        "type": "function",
+    }
+]
+
+accfinance_stake_abi = [
+    {
+        "inputs": [
+            {"internalType": "uint256", "name": "assets", "type": "uint256"},
+            {"internalType": "address", "name": "receiver", "type": "address"},
+        ],
+        "name": "deposit",
+        "outputs": [],
+        "stateMutability": "nonpayable",
+        "type": "function",
+    }
+]
+
+rangeprotocol_pool_abi = [
+    {
+        "inputs": [
+            {"internalType": "uint256", "name": "mintAmount", "type": "uint256"},
+            {"internalType": "uint256[2]", "name": "maxAmounts", "type": "uint256[2]"},
+        ],
+        "name": "mint",
+        "outputs": [],
+        "stateMutability": "nonpayable",
+        "type": "function",
+    },
+    {
+        "constant": True,
+        "inputs": [
+            {"internalType": "uint128", "name": "amountXMax", "type": "uint128"},
+            {"internalType": "uint128", "name": "amountYMax", "type": "uint128"},
+        ],
+        "name": "getMintAmounts",
+        "outputs": [
+            {"internalType": "uint128", "name": "mintAmount", "type": "uint128"},
+            {"internalType": "uint128", "name": "amountXUsed", "type": "uint128"},
+            {"internalType": "uint128", "name": "amountYUsed", "type": "uint128"},
+        ],
+        "payable": False,
+        "stateMutability": "view",
+        "type": "function",
+    },
+]
