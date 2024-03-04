@@ -61,6 +61,18 @@ def create_web3_with_proxy(rpc_endpoint, proxy=None):
     return web3
 
 
+def extract_ip_from_proxy(proxy):
+    if proxy.startswith("http://"):
+        proxy = proxy[7:]
+    elif proxy.startswith("https://"):
+        proxy = proxy[8:]
+
+    at_split = proxy.split("@")[-1]
+    ip = at_split.split(":")[0]
+
+    return ip
+
+
 def create_session(proxy=None, check_proxy=False):
     session = requests.Session()
     session.headers.update(
@@ -78,8 +90,7 @@ def create_session(proxy=None, check_proxy=False):
 
     if check_proxy and proxy:
         try:
-            parsed_proxy = urlparse(proxy)
-            proxy_ip = parsed_proxy.hostname
+            proxy_ip = extract_ip_from_proxy(proxy)
             actual_ip = session.get("https://api.ipify.org").text
             if actual_ip != proxy_ip:
                 raise Exception(
