@@ -1,16 +1,18 @@
-import requests
 import time
-from web3 import Web3
-from eth_account.messages import encode_structured_data
+from urllib.parse import urlparse
+
+import requests
 from fake_useragent import UserAgent
-from contracts_abi import pool_abi, approve_abi, encoding_contract_abi, multicall_abi
+from requests.sessions import Session
+from web3 import Web3
+from web3.middleware import geth_poa_middleware
+from web3.providers.rpc import HTTPProvider
+from eth_account.messages import encode_structured_data
+
 from config import (
     RPC,
-    BSC_RPC,
-    bnb_value_bsc,
     bnb_value_zeta,
     pool_zeta_value,
-    bsc_gasprice,
     bnb_to_approve,
     check_user_points_time,
     check_tasks_time,
@@ -20,6 +22,18 @@ from config import (
     zeta_value_btc,
     zeta_value_eth,
     zeta_value_bnb,
+    eddy_finance_zeta,
+    acc_finance_zeta,
+    range_protocol_zeta,
+)
+from contracts_abi import (
+    pool_abi,
+    approve_abi,
+    encoding_contract_abi,
+    multicall_abi,
+    accfinance_mint_abi,
+    accfinance_stake_abi,
+    rangeprotocol_pool_abi,
 )
 
 
@@ -32,17 +46,82 @@ def create_web3_with_proxy(rpc_endpoint, proxy=None):
     if proxy is None:
         return Web3(Web3.HTTPProvider(rpc_endpoint))
 
-    proxy_type = proxy.split(":")[0]
-    request_kwargs = {"proxies": {proxy_type: proxy}}
+    proxy_settings = {
+        "http": proxy,
+        "https": proxy,
+    }
 
-    return Web3(Web3.HTTPProvider(rpc_endpoint, request_kwargs=request_kwargs))
+    session = Session()
+    session.proxies = proxy_settings
+
+    custom_provider = HTTPProvider(rpc_endpoint, session=session)
+    web3 = Web3(custom_provider)
+    web3.middleware_onion.inject(geth_poa_middleware, layer=0)
+
+    return web3
 
 
-def create_proxy(proxy=None):
-    if proxy is not None:
-        proxy_type = proxy.split(":")[0]
-        return {proxy_type: proxy}
-    return None
+def create_session(proxy=None, check_proxy=False):
+    session = requests.Session()
+    session.headers.update(
+        {
+            "User-Agent": UserAgent().random,
+            "Accept": "application/json, text/plain, */*",
+            "Origin": "https://hub.zetachain.com",
+            "Connection": "keep-alive",
+            "Referer": "https://hub.zetachain.com/",
+        }
+    )
+
+    if proxy:
+        session.proxies = {"http": proxy, "https": proxy}
+
+    if check_proxy and proxy:
+        try:
+            parsed_proxy = urlparse(proxy)
+            proxy_ip = parsed_proxy.hostname
+            actual_ip = session.get("https://api.ipify.org").text
+            if actual_ip != proxy_ip:
+                raise Exception(
+                    f"Error: Proxy IP ({proxy_ip}) does not match actual IP ({actual_ip}). Stopping script."
+                )
+
+            else:
+                print(f"Proxy check passed: {actual_ip}")
+        except requests.RequestException as e:
+            raise Exception(f"Error during proxy check: {e}")
+
+    return session
+
+
+def estimate_gas_and_send(web3, tx, private_key, tx_name):
+    tx["gas"] = int(web3.eth.estimate_gas(tx))
+    signed_txn = web3.eth.account.sign_transaction(tx, private_key)
+    transaction_hash = web3.eth.send_raw_transaction(signed_txn.rawTransaction).hex()
+
+    print(f"{current_time()} | Waiting {tx_name} to complete...")
+    receipt = web3.eth.wait_for_transaction_receipt(transaction_hash)
+    if receipt.status != 1:
+        print(f"{current_time()} | Transaction {transaction_hash} failed!")
+        time.sleep(transactions_break_time)
+        return
+
+    print(f"{current_time()} | {tx_name} hash: {transaction_hash}")
+    time.sleep(transactions_break_time)
+
+
+def create_transaction(web3, private_key, tx_name, to, value, data):
+    account = web3.eth.account.from_key(private_key)
+    tx = {
+        "from": account.address,
+        "to": web3.to_checksum_address(to),
+        "value": value,
+        "nonce": web3.eth.get_transaction_count(account.address),
+        "gasPrice": web3.eth.gas_price,
+        "chainId": 7000,
+        "data": data,
+    }
+    estimate_gas_and_send(web3, tx, private_key, tx_name)
 
 
 def generate_signature(private_key: str, proxy=None) -> hex:
@@ -70,53 +149,26 @@ def generate_signature(private_key: str, proxy=None) -> hex:
 
 def enroll(private_key: str, proxy=None) -> str:
     web3 = create_web3_with_proxy(RPC, proxy)
-    account = web3.eth.account.from_key(private_key)
-    tx = {
-        "from": account.address,
-        "to": web3.to_checksum_address("0x3C85e0cA1001F085A3e58d55A0D76E2E8B0A33f9"),
-        "value": 0,
-        "nonce": web3.eth.get_transaction_count(account.address),
-        "gasPrice": web3.eth.gas_price,
-        "chainId": 7000,
-        "data": "0xb9daad50000000000000000000000000a1f094bb96ccf23ce843b05d0ceb32d2a027875b0000000000000000000000000000000000000000000000000000000065eb22e7000000000000000000000000000000000000000000000000000000000000001c19e0a965ecc7e364205e0694abe5fb72300f53fd6732bcd49dca98c968b3b1ae73f0452fc26d410876c60bf399281663fe628cd88f7ce1eb67015c319a72e5f4",
-    }
-    tx["gas"] = int(web3.eth.estimate_gas(tx))
-
-    signed_txn = web3.eth.account.sign_transaction(tx, private_key)
-    transaction_hash = web3.eth.send_raw_transaction(signed_txn.rawTransaction).hex()
-
-    print(f"{current_time()} | Waiting for Enroll TX to complete...")
-    receipt = web3.eth.wait_for_transaction_receipt(transaction_hash)
-    if receipt.status != 1:
-        print(f"{current_time()} | Transaction {transaction_hash} failed!")
-        time.sleep(transactions_break_time)
-        return
-
-    print(f"{current_time()} | Enroll (register) hash: {transaction_hash}")
-    time.sleep(transactions_break_time)
+    create_transaction(
+        web3=web3,
+        private_key=private_key,
+        tx_name="Enroll Transaction",
+        to="0x3C85e0cA1001F085A3e58d55A0D76E2E8B0A33f9",
+        value=0,
+        data="0xb9daad50000000000000000000000000a1f094bb96ccf23ce843b05d0ceb32d2a027875b0000000000000000000000000000000000000000000000000000000065eb22e7000000000000000000000000000000000000000000000000000000000000001c19e0a965ecc7e364205e0694abe5fb72300f53fd6732bcd49dca98c968b3b1ae73f0452fc26d410876c60bf399281663fe628cd88f7ce1eb67015c319a72e5f4",
+    )
 
 
 def enroll_verify(private_key: str, proxy=None):
     web3 = create_web3_with_proxy(RPC, proxy)
     account = web3.eth.account.from_key(private_key)
     print(f"{current_time()} |  Verifying enroll for {account.address}...")
-
-    headers = {
-        "User-Agent": UserAgent().random,
-        "authority": "xp.cl04.zetachain.com",
-        "Accept": "application/json, text/plain, */*",
-        "Origin": "https://hub.zetachain.com",
-        "Referer": "https://hub.zetachain.com/",
-    }
-    params = {
-        "address": account.address,
-    }
-    
-    response = requests.post(
+    session = create_session(proxy=proxy, check_proxy=True)
+    response = session.post(
         "https://xp.cl04.zetachain.com/v1/enroll-in-zeta-xp",
-        headers=headers,
-        json=params,
-        proxies=create_proxy(proxy),
+        json={
+            "address": account.address,
+        },
     )
     if response.status_code == 200:
         response = response.json()
@@ -129,73 +181,26 @@ def enroll_verify(private_key: str, proxy=None):
 
 def transfer(private_key: str, proxy=None) -> str:
     web3 = create_web3_with_proxy(RPC, proxy)
-    account = web3.eth.account.from_key(private_key)
-    tx = {
-        "from": account.address,
-        "to": account.address,
-        "value": web3.to_wei(0, "ether"),
-        "nonce": web3.eth.get_transaction_count(account.address),
-        "gasPrice": web3.eth.gas_price,
-        "chainId": 7000,
-    }
-    tx["gas"] = int(web3.eth.estimate_gas(tx))
-    signed_txn = web3.eth.account.sign_transaction(tx, private_key)
-    transaction_hash = web3.eth.send_raw_transaction(signed_txn.rawTransaction).hex()
-    print(f"{current_time()} | Waiting for Self transfer TX to complete...")
-    receipt = web3.eth.wait_for_transaction_receipt(transaction_hash)
-    if receipt.status != 1:
-        print(f"{current_time()} | Transaction {transaction_hash} failed!")
-        time.sleep(transactions_break_time)
-    print(f"{current_time()} | Send & Receive TX hash: {transaction_hash}")
-    time.sleep(transactions_break_time)
-
-
-def bsc_quest(private_key: str, proxy=None) -> str:
-    web3 = create_web3_with_proxy(BSC_RPC, proxy)
-    account = web3.eth.account.from_key(private_key)
-    tx = {
-        "from": account.address,
-        "to": web3.to_checksum_address(
-            "0x70e967acFcC17c3941E87562161406d41676FD83"
-        ),  # BSC address to bridge bnb -> zeta
-        "value": web3.to_wei(bnb_value_bsc, "ether"),
-        "nonce": web3.eth.get_transaction_count(account.address),
-        "gasPrice": web3.to_wei(bsc_gasprice, "gwei"),
-        "chainId": 56,
-    }
-    tx["gas"] = int(web3.eth.estimate_gas(tx))
-    signed_txn = web3.eth.account.sign_transaction(tx, private_key)
-    transaction_hash = web3.eth.send_raw_transaction(signed_txn.rawTransaction).hex()
-    print(f"{current_time()} | Waiting for BSC transfer TX to complete...")
-    receipt = web3.eth.wait_for_transaction_receipt(transaction_hash)
-    if receipt.status != 1:
-        print(f"{current_time()} | Transaction {transaction_hash} failed!")
-        time.sleep(transactions_break_time)
-    print(f"{current_time()} | Receive BNB from BSC TX: {transaction_hash}")
-    time.sleep(transactions_break_time)
+    create_transaction(
+        web3=web3,
+        private_key=private_key,
+        tx_name="Send & Receive ZETA TX",
+        to=web3.eth.account.from_key(private_key).address,
+        value=0,
+        data="0x",
+    )
 
 
 def check_user_points(private_key: str, proxy=None):
     web3 = create_web3_with_proxy(RPC, proxy)
     account = web3.eth.account.from_key(private_key)
-    session = requests.Session()
-    session.headers.update(
-        {
-            "User-Agent": UserAgent().random,
-            "Accept": "application/json, text/plain, */*",
-            "Origin": "https://hub.zetachain.com",
-            "Connection": "keep-alive",
-            "Referer": "https://hub.zetachain.com/",
-        }
-    )
-    params = {
-        "address": account.address,
-    }
+    session = create_session(proxy, check_proxy=True)
 
     response = session.get(
         "https://xp.cl04.zetachain.com/v1/get-points",
-        params=params,
-        proxies=create_proxy(proxy),
+        params={
+            "address": account.address,
+        },
     )
     if response.status_code == 200:
         response = response.json()
@@ -211,22 +216,13 @@ def check_user_points(private_key: str, proxy=None):
 def check_tasks(private_key: str, proxy=None):
     web3 = create_web3_with_proxy(RPC, proxy)
     account = web3.eth.account.from_key(private_key)
-    headers = {
-        "User-Agent": UserAgent().random,
-        "Accept": "application/json, text/plain, */*",
-        "Origin": "https://hub.zetachain.com",
-        "Connection": "keep-alive",
-        "Referer": "https://hub.zetachain.com/",
-    }
-    check_params = {
-        "address": account.address,
-    }
+    session = create_session(proxy=proxy, check_proxy=True)
 
-    check_resp = requests.get(
+    check_resp = session.get(
         "https://xp.cl04.zetachain.com/v1/get-user-has-xp-to-refresh",
-        params=check_params,
-        headers=headers,
-        proxies=create_proxy(proxy),
+        params={
+            "address": account.address,
+        },
     )
     quests_to_refresh = []
     check_resp = check_resp.json()
@@ -242,7 +238,8 @@ def check_tasks(private_key: str, proxy=None):
 def claim_tasks(private_key: str, proxy=None):
     web3 = create_web3_with_proxy(RPC, proxy)
     account = web3.eth.account.from_key(private_key)
-    quest_list = check_tasks(private_key)
+    session = create_session(proxy=proxy, check_proxy=True)
+    quest_list = check_tasks(private_key, proxy=proxy)
 
     if quest_list == []:
         print(f"{current_time()} | Nothing to claim for address {account.address}")
@@ -250,25 +247,14 @@ def claim_tasks(private_key: str, proxy=None):
         return
 
     for quest in quest_list:
-        session = requests.Session()
         claim_data = {
             "address": account.address,
             "task": quest,
             "signedMessage": generate_signature(private_key),
         }
-        session.headers.update(
-            {
-                "User-Agent": UserAgent().random,
-                "Accept": "application/json, text/plain, */*",
-                "Origin": "https://hub.zetachain.com",
-                "Connection": "keep-alive",
-                "Referer": "https://hub.zetachain.com/",
-            }
-        )
         response = session.post(
             "https://xp.cl04.zetachain.com/v1/xp/claim-task",
             json=claim_data,
-            proxies=create_proxy(proxy),
         )
         response = response.json()
 
@@ -283,32 +269,25 @@ def pool_tx(private_key: str, proxy=None):
         abi=pool_abi,
     )
     account = web3.eth.account.from_key(private_key)
-    tx = contract.functions.addLiquidityETH(
-        web3.to_checksum_address("0x48f80608B672DC30DC7e3dbBd0343c5F02C738Eb"),
-        web3.to_wei(bnb_value_zeta, "ether"),
-        0,
-        0,
-        account.address,
-        web3.eth.get_block("latest").timestamp + 3600,
-    ).build_transaction(
-        {
-            "from": account.address,
-            "value": web3.to_wei(pool_zeta_value, "ether"),
-            "nonce": web3.eth.get_transaction_count(account.address),
-            "gasPrice": web3.eth.gas_price,
-            "chainId": 7000,
-        }
+    data = contract.encodeABI(
+        fn_name="addLiquidityETH",
+        args=[
+            web3.to_checksum_address("0x48f80608B672DC30DC7e3dbBd0343c5F02C738Eb"),
+            web3.to_wei(bnb_value_zeta, "ether"),
+            0,
+            0,
+            account.address,
+            web3.eth.get_block("latest").timestamp + 3600,
+        ],
     )
-    tx["gas"] = int(web3.eth.estimate_gas(tx))
-    signed_txn = web3.eth.account.sign_transaction(tx, private_key)
-    transaction_hash = web3.eth.send_raw_transaction(signed_txn.rawTransaction).hex()
-    print(f"{current_time()} | Waiting for Pool deposit TX to complete...")
-    receipt = web3.eth.wait_for_transaction_receipt(transaction_hash)
-    if receipt.status != 1:
-        print(f"{current_time()} | Transaction {transaction_hash} failed!")
-        time.sleep(transactions_break_time)
-    print(f"{current_time()} | Pool deposit TX hash: {transaction_hash}")
-    time.sleep(transactions_break_time)
+    create_transaction(
+        web3=web3,
+        private_key=private_key,
+        tx_name="Pool Deposit TX",
+        to=contract.address,
+        value=web3.to_wei(pool_zeta_value, "ether"),
+        data=data,
+    )
 
 
 def approve(private_key: str, proxy=None):
@@ -317,29 +296,21 @@ def approve(private_key: str, proxy=None):
         address=web3.to_checksum_address("0x48f80608B672DC30DC7e3dbBd0343c5F02C738Eb"),
         abi=approve_abi,
     )
-    account = web3.eth.account.from_key(private_key)
-    tx = contract.functions.approve(
-        web3.to_checksum_address("0x2ca7d64A7EFE2D62A725E2B35Cf7230D6677FfEe"),
-        web3.to_wei(bnb_to_approve, "ether"),
-    ).build_transaction(
-        {
-            "from": account.address,
-            "value": 0,
-            "nonce": web3.eth.get_transaction_count(account.address),
-            "gasPrice": web3.eth.gas_price,
-            "chainId": 7000,
-        }
+    data = contract.encodeABI(
+        fn_name="approve",
+        args=[
+            web3.to_checksum_address("0x2ca7d64A7EFE2D62A725E2B35Cf7230D6677FfEe"),
+            web3.to_wei(bnb_to_approve, "ether"),
+        ],
     )
-    tx["gas"] = int(web3.eth.estimate_gas(tx))
-    signed_txn = web3.eth.account.sign_transaction(tx, private_key)
-    transaction_hash = web3.eth.send_raw_transaction(signed_txn.rawTransaction).hex()
-    print(f"{current_time()} | Waiting for Approve TX to complete...")
-    receipt = web3.eth.wait_for_transaction_receipt(transaction_hash)
-    if receipt.status != 1:
-        print(f"{current_time()} | Transaction {transaction_hash} failed!")
-        time.sleep(transactions_break_time)
-    print(f"{current_time()} | Approve hash: {transaction_hash}")
-    time.sleep(transactions_break_time)
+    create_transaction(
+        web3=web3,
+        private_key=private_key,
+        tx_name="Approve for Pool TX",
+        to=contract.address,
+        value=0,
+        data=data,
+    )
 
 
 def btc_quest(private_key: str, proxy=None):
@@ -368,25 +339,14 @@ def btc_quest(private_key: str, proxy=None):
     tx_data = main_contract.encodeABI(
         fn_name="multicall", args=[[encoded_data, "0x12210e8a"]]
     )
-    tx = {
-        "from": account.address,
-        "to": web3.to_checksum_address("0x34bc1b87f60e0a30c0e24FD7Abada70436c71406"),
-        "value": web3.to_wei(zeta_value_btc, "ether"),
-        "nonce": web3.eth.get_transaction_count(account.address),
-        "gasPrice": web3.eth.gas_price,
-        "chainId": 7000,
-        "data": tx_data,
-    }
-    tx["gas"] = int(web3.eth.estimate_gas(tx))
-    signed_txn = web3.eth.account.sign_transaction(tx, private_key)
-    transaction_hash = web3.eth.send_raw_transaction(signed_txn.rawTransaction).hex()
-    print(f"{current_time()} | Waiting for BTC quest TX to complete...")
-    receipt = web3.eth.wait_for_transaction_receipt(transaction_hash)
-    if receipt.status != 1:
-        print(f"{current_time()} | Transaction {transaction_hash} failed!")
-        time.sleep(transactions_break_time)
-    print(f"{current_time()} | Receive BTC TX: {transaction_hash}")
-    time.sleep(transactions_break_time)
+    create_transaction(
+        web3=web3,
+        private_key=private_key,
+        tx_name="BTC Quest TX",
+        to="0x34bc1b87f60e0a30c0e24FD7Abada70436c71406",
+        value=web3.to_wei(zeta_value_btc, "ether"),
+        data=tx_data,
+    )
 
 
 def eth_quest(private_key: str, proxy=None):
@@ -415,26 +375,14 @@ def eth_quest(private_key: str, proxy=None):
     tx_data = main_contract.encodeABI(
         fn_name="multicall", args=[[encoded_data, "0x12210e8a"]]
     )
-
-    tx = {
-        "from": account.address,
-        "to": web3.to_checksum_address("0x34bc1b87f60e0a30c0e24FD7Abada70436c71406"),
-        "value": web3.to_wei(zeta_value_eth, "ether"),
-        "nonce": web3.eth.get_transaction_count(account.address),
-        "gasPrice": web3.eth.gas_price,
-        "chainId": 7000,
-        "data": tx_data,
-    }
-    tx["gas"] = int(web3.eth.estimate_gas(tx))
-    signed_txn = web3.eth.account.sign_transaction(tx, private_key)
-    transaction_hash = web3.eth.send_raw_transaction(signed_txn.rawTransaction).hex()
-    print(f"{current_time()} | Waiting for ETH quest TX to complete...")
-    receipt = web3.eth.wait_for_transaction_receipt(transaction_hash)
-    if receipt.status != 1:
-        print(f"{current_time()} | Transaction {transaction_hash} failed!")
-        time.sleep(transactions_break_time)
-    print(f"{current_time()} | Receive ETH TX: {transaction_hash}")
-    time.sleep(transactions_break_time)
+    create_transaction(
+        web3=web3,
+        private_key=private_key,
+        tx_name="ETH Quest TX",
+        to="0x34bc1b87f60e0a30c0e24FD7Abada70436c71406",
+        value=web3.to_wei(zeta_value_eth, "ether"),
+        data=tx_data,
+    )
 
 
 def bsc_izumi_quest(private_key: str, proxy=None):
@@ -463,23 +411,153 @@ def bsc_izumi_quest(private_key: str, proxy=None):
     tx_data = main_contract.encodeABI(
         fn_name="multicall", args=[[encoded_data, "0x12210e8a"]]
     )
+    create_transaction(
+        web3=web3,
+        private_key=private_key,
+        tx_name="BNB (Izumi Finance) quest",
+        to="0x34bc1b87f60e0a30c0e24FD7Abada70436c71406",
+        value=web3.to_wei(zeta_value_bnb, "ether"),
+        data=tx_data,
+    )
 
-    tx = {
-        "from": account.address,
-        "to": web3.to_checksum_address("0x34bc1b87f60e0a30c0e24FD7Abada70436c71406"),
-        "value": web3.to_wei(zeta_value_bnb, "ether"),
-        "nonce": web3.eth.get_transaction_count(account.address),
-        "gasPrice": web3.eth.gas_price,
-        "chainId": 7000,
-        "data": tx_data,
+
+def eddy_finance(private_key: str, proxy=None):
+    web3 = create_web3_with_proxy(RPC, proxy)
+    create_transaction(
+        web3=web3,
+        private_key=private_key,
+        tx_name="ZETA -> BNB.BSC (Eddy Finance)",
+        to="0xDE3167958Ad6251E8D6fF1791648b322Fc6B51bD",
+        value=web3.to_wei(eddy_finance_zeta, "ether"),
+        data="0x148e6bcc0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000004000000000000000000000000000000000000000000000000000000000000000020000000000000000000000005f0b1a82749cb4e2278ec87f8bf6b618dc71a8bf00000000000000000000000048f80608b672dc30dc7e3dbbd0343c5f02c738eb",
+    )
+
+
+def accumulated_finance(private_key: str, proxy=None):
+    web3 = create_web3_with_proxy(RPC, proxy)
+    account = web3.eth.account.from_key(private_key)
+    accfinance_contract = web3.eth.contract(
+        address=web3.to_checksum_address("0xcf1A40eFf1A4d4c56DC4042A1aE93013d13C3217"),
+        abi=accfinance_mint_abi,
+    )
+    stzeta_stake_contract = web3.eth.contract(
+        address=web3.to_checksum_address("0x7AC168c81F4F3820Fa3F22603ce5864D6aB3C547"),
+        abi=accfinance_stake_abi,
+    )
+    data = accfinance_contract.encodeABI(
+        fn_name="deposit",
+        args=[
+            account.address,
+        ],
+    )
+    create_transaction(
+        web3=web3,
+        private_key=private_key,
+        tx_name="stZETA Mint",
+        to=accfinance_contract.address,
+        value=web3.to_wei(acc_finance_zeta, "ether"),
+        data=data,
+    )
+    create_transaction(
+        web3=web3,
+        private_key=private_key,
+        tx_name="stZETA Approve for staking",
+        to="0xcba2aeEc821b0B119857a9aB39E09b034249681A",
+        value=0,
+        data="0x095ea7b30000000000000000000000007ac168c81f4f3820fa3f22603ce5864d6ab3c547ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+    )
+
+    stake_data = stzeta_stake_contract.encodeABI(
+        fn_name="deposit",
+        args=[web3.to_wei(acc_finance_zeta, "ether"), account.address],
+    )
+    create_transaction(
+        web3=web3,
+        private_key=private_key,
+        tx_name="stZETA Staking",
+        to=stzeta_stake_contract.address,
+        value=0,
+        data=stake_data,
+    )
+
+
+def range_protocol(private_key: str, proxy=None):
+    web3 = create_web3_with_proxy(RPC, proxy)
+    session = create_session(proxy=proxy, check_proxy=True)
+    json_data = {
+        "query": "\n      query getVaultItemById($vaultId: String) {\n        vault(id: $vaultId) {\n          \n  id\n  liquidity\n  balance0\n  balance1\n  totalSupply\n  totalFeesEarned0\n  totalFeesEarned1\n  tokenX\n  tokenY\n  firstMintAtBlock\n  managerBalanceX\n  managerBalanceY\n  name\n  tag\n  pool\n\n          managingFee\n          performanceFee\n        }\n      }\n    ",
+        "variables": {
+            "vaultId": "0x08F4539f91faA96b34323c11C9B00123bA19eef3",
+        },
+        "operationName": "getVaultItemById",
     }
-    tx["gas"] = int(web3.eth.estimate_gas(tx))
-    signed_txn = web3.eth.account.sign_transaction(tx, private_key)
-    transaction_hash = web3.eth.send_raw_transaction(signed_txn.rawTransaction).hex()
-    print(f"{current_time()} | Waiting for BNB (Izumi Finance) quest TX to complete...")
-    receipt = web3.eth.wait_for_transaction_receipt(transaction_hash)
-    if receipt.status != 1:
-        print(f"{current_time()} | Transaction {transaction_hash} failed!")
-        time.sleep(transactions_break_time)
-    print(f"{current_time()} | Receive BNB TX: {transaction_hash}")
-    time.sleep(transactions_break_time)
+
+    response = session.post(
+        "https://api.goldsky.com/api/public/project_clm97huay3j9y2nw04d8nhmrt/subgraphs/zetachain-izumi/0.2/gn",
+        json=json_data,
+    ).json()
+
+    balance0 = int(response["data"]["vault"]["balance0"])
+    balance1 = int(response["data"]["vault"]["balance1"])
+    pool_balance = int(response["data"]["vault"]["balance0"]) + int(
+        response["data"]["vault"]["balance1"]
+    )
+    part0 = balance0 / pool_balance
+    part1 = balance1 / pool_balance
+
+    stzeta_amount = int(web3.to_wei(range_protocol_zeta, "ether") * part0)
+    wzeta_amount = int(web3.to_wei(range_protocol_zeta, "ether") * part1)
+
+    create_transaction(
+        web3=web3,
+        private_key=private_key,
+        tx_name="ZETA -> stZETA Swap",
+        to="0x45334a5B0a01cE6C260f2B570EC941C680EA62c0",
+        value=int(stzeta_amount * 0.95),
+        data="0x5bcb2fc6",
+    )
+    create_transaction(
+        web3=web3,
+        private_key=private_key,
+        tx_name="ZETA deposit to WZETA",
+        to="0x5F0b1a82749cb4E2278EC87F8BF6B618dC71a8bf",
+        value=int(wzeta_amount * 0.95),
+        data="0xd0e30db0",
+    )
+    create_transaction(
+        web3=web3,
+        private_key=private_key,
+        tx_name="stZETA Approve",
+        to="0x45334a5b0a01ce6c260f2b570ec941c680ea62c0",
+        value=0,
+        data="0x095ea7b300000000000000000000000008f4539f91faa96b34323c11c9b00123ba19eef3ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+    )
+    create_transaction(
+        web3=web3,
+        private_key=private_key,
+        tx_name="wZETA Approve",
+        to="0x5f0b1a82749cb4e2278ec87f8bf6b618dc71a8bf",
+        value=0,
+        data="0x095ea7b300000000000000000000000008f4539f91faa96b34323c11c9b00123ba19eef3ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+    )
+
+    range_protocol_contract = web3.eth.contract(
+        address=web3.to_checksum_address("0x08F4539f91faA96b34323c11C9B00123bA19eef3"),
+        abi=rangeprotocol_pool_abi,
+    )
+
+    amounts = range_protocol_contract.functions.getMintAmounts(
+        int(stzeta_amount * 0.5), int(stzeta_amount * 0.5)
+    ).call()
+    data = range_protocol_contract.encodeABI(
+        fn_name="mint",
+        args=[amounts[2], [amounts[0], amounts[1]]],
+    )
+    create_transaction(
+        web3=web3,
+        private_key=private_key,
+        tx_name="stZETA & wZETA Pool Deposit",
+        to=range_protocol_contract.address,
+        value=0,
+        data=data,
+    )
