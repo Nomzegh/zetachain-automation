@@ -7,7 +7,7 @@ from requests.sessions import Session
 from web3 import Web3
 from web3.middleware import geth_poa_middleware
 from web3.providers.rpc import HTTPProvider
-from eth_account.messages import encode_structured_data
+from eth_account.messages import encode_structured_data, encode_defunct
 
 from config import (
     RPC,
@@ -25,6 +25,7 @@ from config import (
     eddy_finance_zeta,
     acc_finance_zeta,
     range_protocol_zeta,
+    zetaswap_zeta,
 )
 from contracts_abi import (
     pool_abi,
@@ -34,6 +35,7 @@ from contracts_abi import (
     accfinance_mint_abi,
     accfinance_stake_abi,
     rangeprotocol_pool_abi,
+    badge_mint_abi,
 )
 
 
@@ -571,4 +573,125 @@ def range_protocol(private_key: str, proxy=None):
         to=range_protocol_contract.address,
         value=0,
         data=data,
+    )
+
+
+def mint_badge(private_key: str, proxy=None):
+    web3 = create_web3_with_proxy(RPC, proxy)
+    account = web3.eth.account.from_key(private_key)
+    session = create_session(proxy=proxy, check_proxy=True)
+    session.headers.update(
+        {
+            "ul-auth-api-key": "bWlzc2lvbl9ydW5uZXJAZFd4MGFYWmxjbk5s",
+            "Origin": "https://mission.ultiverse.io",
+            "Referer": "https://mission.ultiverse.io/",
+        }
+    )
+    response = session.post(
+        "https://toolkit.ultiverse.io/api/user/signature",
+        json={
+            "address": account.address,
+            "feature": "assets-wallet-login",
+            "chainId": 7000,
+        },
+    ).json()
+
+    json_data = {
+        "address": account.address,
+        "signature": account.sign_message(
+            encode_defunct(text=response["data"]["message"])
+        ).signature.hex(),
+        "chainId": 7000,
+    }
+    response = session.post(
+        "https://toolkit.ultiverse.io/api/wallets/signin",
+        json=json_data,
+    ).json()
+    access_token = response["data"]["access_token"]
+    session.cookies.update({"Ultiverse_Authorization": access_token})
+    session.headers.update(
+        {
+            "Authority": "mission.ultiverse.io",
+            "Referer": "https://mission.ultiverse.io/t/ZmluZHBhdGh8MTcwNjg2MDczMTkzMQ==",
+            "ul-auth-token": access_token,
+        }
+    )
+    response = session.post(
+        "https://mission.ultiverse.io/api/tickets/mint",
+        json={
+            "eventId": 10,
+            "address": account.address,
+        },
+    ).json()
+    badge_contract = web3.eth.contract(
+        address=web3.to_checksum_address(response["data"]["contract"]),
+        abi=badge_mint_abi,
+    )
+    data = badge_contract.encodeABI(
+        fn_name="buy",
+        args=[
+            int(response["data"]["expireAt"]),
+            int(response["data"]["tokenId"]),
+            int(response["data"]["eventId"]),
+            response["data"]["signature"],
+        ],
+    )
+    create_transaction(
+        web3=web3,
+        private_key=private_key,
+        tx_name="ZETA Badge Mint",
+        to=badge_contract.address,
+        value=0,
+        data=data,
+    )
+
+
+def zetaswap_quest(private_key: str, proxy=None):
+    web3 = create_web3_with_proxy(RPC, proxy)
+    account = web3.eth.account.from_key(private_key)
+    session = create_session(proxy=proxy, check_proxy=True)
+    create_transaction(
+        web3=web3,
+        private_key=private_key,
+        tx_name="ZETA -> wZETA SWAP",
+        to=web3.to_checksum_address("0x5F0b1a82749cb4E2278EC87F8BF6B618dC71a8bf"),
+        value=web3.to_wei(zetaswap_zeta, "ether"),
+        data="0xd0e30db0",
+    )
+    create_transaction(
+        web3=web3,
+        private_key=private_key,
+        tx_name="Approve wZETA",
+        to=web3.to_checksum_address("0x5F0b1a82749cb4E2278EC87F8BF6B618dC71a8bf"),
+        value=0,
+        data="0x095ea7b3000000000000000000000000c6f7a7ba5388bfb5774bfaa87d350b7793fd9ef1ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+    )
+    session.headers.update(
+        {
+            "authority": "newapi.native.org",
+            "api_key": "7e5e5cc85bb10c1a7c5b2836b55e00acfe0a9509",
+            "apikey": "7e5e5cc85bb10c1a7c5b2836b55e00acfe0a9509",
+            "Origin": "https://app.zetaswap.com",
+            "Referer": "https://app.zetaswap.com/",
+        }
+    )
+    response = session.get(
+        "https://newapi.native.org/v1/firm-quote",
+        params={
+            "src_chain": "zetachain",
+            "dst_chain": "zetachain",
+            "token_in": "0x5F0b1a82749cb4E2278EC87F8BF6B618dC71a8bf",
+            "token_out": "0xd97b1de3619ed2c6beb3860147e30ca8a7dc9891",
+            "amount": zetaswap_zeta,
+            "address": account.address,
+            "slippage": "2",
+        },
+    ).json()
+    create_transaction(
+        web3=web3,
+        private_key=private_key,
+        tx_name="wZETA -> ETH.ETH SWAP",
+        to=response["txRequest"]["target"],
+        value=0,
+        data=response["txRequest"]["calldata"],
     )
