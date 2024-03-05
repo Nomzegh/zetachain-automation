@@ -14,6 +14,8 @@ from functions import (
     eddy_finance,
     accumulated_finance,
     range_protocol,
+    mint_badge,
+    zetaswap_quest,
 )
 
 RPC = "https://zetachain-mainnet-archive.allthatnode.com:8545"
@@ -47,8 +49,10 @@ if __name__ == "__main__":
             "\n9: EddyFinance quest         | +2500 XP"
             "\n10: Liquidity on Range quest | +2500 XP"
             "\n11: Accumulated Finance quest| +2500 XP"
-            "\n12: Check total XP|Rank|Level"
-            "\n13: Claim all available tasks"
+            "\n12: Mint a badge on Ultiverse| +2500 XP"
+            "\n13: Zetaswap wZETA->ETH.ETH  | +2500 XP"
+            "\n14: Check total XP|Rank|Level"
+            "\n15: Claim all available tasks"
             "\n----------------------"
             "\nChoice: "
         )
@@ -65,8 +69,10 @@ if __name__ == "__main__":
         9: eddy_finance,
         10: range_protocol,
         11: accumulated_finance,
-        12: check_user_points,
-        13: claim_tasks,
+        12: mint_badge,
+        13: zetaswap_quest,
+        14: check_user_points,
+        15: claim_tasks,
     }
 
     for key, proxy in zip(private_keys, proxies):
