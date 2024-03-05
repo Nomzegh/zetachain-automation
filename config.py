@@ -11,6 +11,7 @@ zeta_value_bnb = 0.001  # Сколько отдаем ZETA для транзак
 eddy_finance_zeta = 2.3  # Сколько отдаем ZETA для свапа в BNB.BSC на EddyFinance (Следим за ценой ZETA т.к свап от $5)
 acc_finance_zeta = 0.000001  # Сколько отдаем ZETA для транзакций на Accumulated Finance
 range_protocol_zeta = 0.002  # Сколько отдаем ZETA для транзакций на Range Protocol.
+zetaswap_zeta = 0.0001  # Сколько отдаем ZETA на квест Zetaswap (wZETA -> ETH.ETH)
 
 # Настройки времени
 enroll_verify_time = 1.5  # Время между Enroll Verify
