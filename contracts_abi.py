@@ -121,3 +121,20 @@ rangeprotocol_pool_abi = [
         "type": "function",
     },
 ]
+
+badge_mint_abi = [
+    {
+        "constant": False,
+        "inputs": [
+            {"internalType": "uint256", "name": "expireAt", "type": "uint256"},
+            {"internalType": "uint256", "name": "tokenId", "type": "uint256"},
+            {"internalType": "uint256", "name": "eventId", "type": "uint256"},
+            {"internalType": "bytes", "name": "signature", "type": "bytes"},
+        ],
+        "name": "buy",
+        "outputs": [],
+        "payable": False,
+        "stateMutability": "nonpayable",
+        "type": "function",
+    }
+]
