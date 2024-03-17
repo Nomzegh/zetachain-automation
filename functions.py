@@ -26,6 +26,7 @@ from config import (
     acc_finance_zeta,
     range_protocol_zeta,
     zetaswap_zeta,
+    badge_id
 )
 from contracts_abi import (
     pool_abi,
@@ -506,7 +507,7 @@ def range_protocol(private_key: str, proxy=None):
     }
 
     response = session.post(
-        "https://api.goldsky.com/api/public/project_clm97huay3j9y2nw04d8nhmrt/subgraphs/zetachain-izumi/0.2/gn",
+        "https://api.goldsky.com/api/public/project_clm97huay3j9y2nw04d8nhmrt/subgraphs/izumi-zetachain/0.2/gn",
         json=json_data,
     ).json()
 
@@ -619,7 +620,7 @@ def mint_badge(private_key: str, proxy=None):
     response = session.post(
         "https://mission.ultiverse.io/api/tickets/mint",
         json={
-            "eventId": 10,
+            "eventId": badge_id,
             "address": account.address,
         },
     ).json()
