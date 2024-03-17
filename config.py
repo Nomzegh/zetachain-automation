@@ -12,6 +12,7 @@ eddy_finance_zeta = 2.3  # Сколько отдаем ZETA для свапа в
 acc_finance_zeta = 0.000001  # Сколько отдаем ZETA для транзакций на Accumulated Finance
 range_protocol_zeta = 0.002  # Сколько отдаем ZETA для транзакций на Range Protocol.
 zetaswap_zeta = 0.0001  # Сколько отдаем ZETA на квест Zetaswap (wZETA -> ETH.ETH)
+badge_id = 10 # ID бейджа на Ultiverse
 
 # Настройки времени
 enroll_verify_time = 1.5  # Время между Enroll Verify
