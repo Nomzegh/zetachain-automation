@@ -26,7 +26,8 @@ from config import (
     acc_finance_zeta,
     range_protocol_zeta,
     zetaswap_zeta,
-    badge_id
+    badge_id,
+    nativex_zeta,
 )
 from contracts_abi import (
     pool_abi,
@@ -694,5 +695,38 @@ def zetaswap_quest(private_key: str, proxy=None):
         tx_name="wZETA -> ETH.ETH SWAP",
         to=response["txRequest"]["target"],
         value=0,
+        data=response["txRequest"]["calldata"],
+    )
+
+
+def nativex_finance(private_key: str, proxy=None):
+    web3 = create_web3_with_proxy(RPC, proxy)
+    account = web3.eth.account.from_key(private_key)
+    session = create_session(proxy=proxy, check_proxy=True)
+    session.headers.update(
+        {
+            "apikey": "JWL73SF2K899AMPFRHZV",
+            "accept": "application/json, text/plain, */*",
+        }
+    )
+    params = {
+        "src_chain": "zetachain",
+        "dst_chain": "zetachain",
+        "token_in": "0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+        "token_out": "0x13a0c5930c028511dc02665e7285134b6d11a5f4",
+        "amount": nativex_zeta,
+        "address": account.address,
+        "slippage": "0.5",
+    }
+    response = session.get(
+        "https://newapi.native.org/swap-api/v1/firm-quote",
+        params=params,
+    ).json()
+    create_transaction(
+        web3=web3,
+        private_key=private_key,
+        tx_name="NativeX Finance: ZETA->BTC.BTC",
+        to=response["txRequest"]["target"],
+        value=web3.to_wei(nativex_zeta, "ether"),
         data=response["txRequest"]["calldata"],
     )
